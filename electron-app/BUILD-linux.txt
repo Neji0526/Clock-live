@@ -1,0 +1,8 @@
+ClockWork Desktop — build instructions for linux
+
+Prerequisites: Node.js 18+ and npm.
+
+1. Unzip.
+2. Run: npm install
+3. Run: npm run dist:linux
+4. Outputs: dist-out/Clockwork-linux-x86_64.AppImage and Clockwork-linux-amd64.deb

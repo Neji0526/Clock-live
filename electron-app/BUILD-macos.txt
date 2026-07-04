@@ -1,0 +1,10 @@
+ClockWork Desktop — build instructions for macos
+
+Prerequisites: Node.js 18+ and npm.
+
+1. Unzip.
+2. Run: npm install
+3. Run: npm run dist:mac
+4. Installer appears in electron-app/dist-out/Clockwork-mac-x64.dmg
+
+Note: signed .dmg requires an Apple Developer ID; unsigned builds run after right-click → Open.

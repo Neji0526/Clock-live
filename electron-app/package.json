@@ -1,0 +1,61 @@
+{
+  "name": "clockwork-desktop",
+  "productName": "ClockWork",
+  "version": "0.4.13",
+  "description": "ClockWork — transparent time and work tracker for virtual assistants (desktop edition).",
+  "main": "main/main.js",
+  "author": "ClockWork",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux",
+    "dist:all": "electron-builder -mwl"
+  },
+  "dependencies": {
+    "active-win": "^8.2.1",
+    "electron-store": "^8.2.0"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.clockwork.desktop",
+    "productName": "ClockWork",
+    "artifactName": "Clockwork-${os}-${arch}.${ext}",
+    "asar": true,
+    "files": [
+      "main/**/*",
+      "renderer/**/*",
+      "build/icon.*",
+      "package.json"
+    ],
+    "directories": {
+      "buildResources": "build",
+      "output": "dist-out"
+    },
+    "win": {
+      "target": ["nsis", "portable"],
+      "icon": "build/icon.png"
+    },
+    "mac": {
+      "target": ["dmg", "zip"],
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.png"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "build/icon.png",
+      "category": "Office"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    }
+  }
+}

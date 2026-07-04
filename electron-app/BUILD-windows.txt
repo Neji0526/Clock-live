@@ -1,0 +1,8 @@
+ClockWork Desktop — build instructions for windows
+
+Prerequisites: Node.js 18+ and npm.
+
+1. Unzip.
+2. Run: npm install
+3. Run: npm run dist:win
+4. Installer appears in electron-app/dist-out/Clockwork-win-x64.exe

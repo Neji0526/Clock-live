@@ -18,7 +18,8 @@ export const Route = createFileRoute("/api/public/desktop-version")({
             // Absolute GitHub Release asset URLs (see src/lib/desktop-version.ts).
             downloads: {
               windows: DESKTOP_DOWNLOADS.windows,
-              mac: DESKTOP_DOWNLOADS.mac,
+              mac_arm64: DESKTOP_DOWNLOADS.macArm,
+              mac_x64: DESKTOP_DOWNLOADS.macIntel,
               linux: DESKTOP_DOWNLOADS.linux,
             },
           },

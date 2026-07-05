@@ -35,23 +35,26 @@ nsis:
   artifactName: ClockWork-Setup-${version}.${ext}
 
 mac:
-  # Build a single "universal" binary (x64 + arm64 in one bundle). Without an
-  # explicit arch, electron-builder only builds for the CI runner's arch — and
-  # since macos-latest is now Apple Silicon (arm64), the DMG was arm64-only and
-  # Intel Macs rejected it with "not supported on this Mac". Universal runs on
-  # both, keeping the single ClockWork-<version>.dmg download URL.
+  # Ship two per-arch DMGs — arm64 (Apple Silicon) and x64 (Intel).
+  # Building only the CI runner's arch (macos-latest is now Apple Silicon)
+  # produced an arm64-only DMG that Intel Macs reject with "not supported on
+  # this Mac". A single "universal" DMG is nicer UX but its @electron/universal
+  # merge step chokes on active-win's native helper, so we build the two arches
+  # separately instead — no merge, both CPU families covered.
   target:
     - target: dmg
-      arch: universal
+      arch:
+        - arm64
+        - x64
   category: public.app-category.productivity
   icon: build/icon.png
-  artifactName: ClockWork-${version}.${ext}
+  artifactName: ClockWork-${version}-${arch}.${ext}
   # desktopCapturer + active-win need Screen Recording permission on macOS.
   extendInfo:
     NSCameraUsageDescription: ClockWork captures periodic screenshots while you are clocked in.
 
 dmg:
-  artifactName: ClockWork-${version}.${ext}
+  artifactName: ClockWork-${version}-${arch}.${ext}
 
 linux:
   # AppImage only — the portable, runnable Linux file. The .deb target needs

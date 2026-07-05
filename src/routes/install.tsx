@@ -159,15 +159,20 @@ function Install() {
           subtitle="Pick your operating system. It installs like any normal desktop app — no Chrome needed."
           done={connected}
         >
-          <div className="grid sm:grid-cols-3 gap-3 max-w-2xl">
+          <div className="grid sm:grid-cols-2 gap-3 max-w-2xl">
             <Button asChild size="lg" className="press justify-start">
               <a href={DESKTOP_DOWNLOADS.windows} download>
                 <Monitor className="size-4 mr-2" /> Windows (.exe)
               </a>
             </Button>
             <Button asChild size="lg" variant="outline" className="press justify-start">
-              <a href={DESKTOP_DOWNLOADS.mac} download>
-                <Apple className="size-4 mr-2" /> macOS (.dmg)
+              <a href={DESKTOP_DOWNLOADS.macArm} download>
+                <Apple className="size-4 mr-2" /> macOS · Apple Silicon (.dmg)
+              </a>
+            </Button>
+            <Button asChild size="lg" variant="outline" className="press justify-start">
+              <a href={DESKTOP_DOWNLOADS.macIntel} download>
+                <Apple className="size-4 mr-2" /> macOS · Intel (.dmg)
               </a>
             </Button>
             <Button asChild size="lg" variant="outline" className="press justify-start">
@@ -196,7 +201,10 @@ function Install() {
               and follow the installer. Launch it from the Start menu.
             </SubStep>
             <SubStep icon={<Apple className="size-3.5" />}>
-              <span className="font-medium text-foreground">macOS:</span> open the{" "}
+              <span className="font-medium text-foreground">macOS:</span> pick{" "}
+              <span className="font-medium text-foreground">Apple Silicon</span> (M1/M2/M3+) or{" "}
+              <span className="font-medium text-foreground">Intel</span> — check via  Apple menu → About This Mac.
+              Open the{" "}
               <code className="px-1.5 py-0.5 rounded bg-muted text-[11px] font-mono">.dmg</code>{" "}
               and drag ClockWork into Applications. On first launch, allow{" "}
               <span className="font-medium text-foreground">Screen Recording</span> in System Settings so screenshots work.

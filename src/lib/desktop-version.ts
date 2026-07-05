@@ -14,6 +14,9 @@ const RELEASE_BASE =
 
 export const DESKTOP_DOWNLOADS = {
   windows: `${RELEASE_BASE}/ClockWork-Setup-${DESKTOP_VERSION}.exe`,
-  mac: `${RELEASE_BASE}/ClockWork-${DESKTOP_VERSION}.dmg`,
+  // Two macOS builds — Apple Silicon (arm64) and Intel (x64). A single arch
+  // DMG would fail on the other CPU family with "not supported on this Mac".
+  macArm: `${RELEASE_BASE}/ClockWork-${DESKTOP_VERSION}-arm64.dmg`,
+  macIntel: `${RELEASE_BASE}/ClockWork-${DESKTOP_VERSION}-x64.dmg`,
   linux: `${RELEASE_BASE}/ClockWork-${DESKTOP_VERSION}.AppImage`,
 } as const;

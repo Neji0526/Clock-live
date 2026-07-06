@@ -123,7 +123,6 @@ function buildFooter(elId, includeLogout = true) {
   if (!el) return;
   el.innerHTML = `
     <a data-act="dash">Dashboard</a>
-    <a data-act="settings">Settings</a>
     ${includeLogout ? '<a data-act="logout">Sign out</a>' : ''}
     <span class="sp"></span>
     <span>v${(st && st.version) || ""}</span>
@@ -138,8 +137,6 @@ async function onFootAct(e) {
     const url = (settings && settings.dashboardUrl) || "";
     if (url) clockwork.tabs.create({ url });
     else toast("Set the dashboard URL in Settings");
-  } else if (act === "settings") {
-    if (clockwork.runtime.openOptionsPage) clockwork.runtime.openOptionsPage();
   } else if (act === "logout") {
     st = await send("wt-logout");
     await refresh();

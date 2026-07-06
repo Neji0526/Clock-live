@@ -44,7 +44,6 @@ function rebuildMenu(st) {
     { label: "Open ClockWork", click: () => actions.openPopup && actions.openPopup() },
     { label: "Open in-app browser", click: () => actions.openBrowser && actions.openBrowser() },
     { type: "separator" },
-    { label: "Settings", click: () => actions.openOptions && actions.openOptions() },
     { label: "Open dashboard", click: () => actions.openDashboard && actions.openDashboard() },
     { type: "separator" },
     { label: "Quit ClockWork", click: () => actions.quit && actions.quit() },

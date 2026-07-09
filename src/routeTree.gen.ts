@@ -30,6 +30,7 @@ import { Route as ApiPublicExtensionVersionRouteImport } from './routes/api/publ
 import { Route as ApiPublicDesktopVersionRouteImport } from './routes/api/public/desktop-version'
 import { Route as AdminInvoicesInvoiceIdRouteImport } from './routes/admin_.invoices.$invoiceId'
 import { Route as ApiPublicHooksCleanupScreenshotsRouteImport } from './routes/api/public/hooks/cleanup-screenshots'
+import { Route as ApiPublicDownloadPlatformRouteImport } from './routes/api/public/download.$platform'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
@@ -138,6 +139,12 @@ const ApiPublicHooksCleanupScreenshotsRoute =
     path: '/api/public/hooks/cleanup-screenshots',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicDownloadPlatformRoute =
+  ApiPublicDownloadPlatformRouteImport.update({
+    id: '/api/public/download/$platform',
+    path: '/api/public/download/$platform',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -160,6 +167,7 @@ export interface FileRoutesByFullPath {
   '/admin/invoices/$invoiceId': typeof AdminInvoicesInvoiceIdRoute
   '/api/public/desktop-version': typeof ApiPublicDesktopVersionRoute
   '/api/public/extension-version': typeof ApiPublicExtensionVersionRoute
+  '/api/public/download/$platform': typeof ApiPublicDownloadPlatformRoute
   '/api/public/hooks/cleanup-screenshots': typeof ApiPublicHooksCleanupScreenshotsRoute
 }
 export interface FileRoutesByTo {
@@ -183,6 +191,7 @@ export interface FileRoutesByTo {
   '/admin/invoices/$invoiceId': typeof AdminInvoicesInvoiceIdRoute
   '/api/public/desktop-version': typeof ApiPublicDesktopVersionRoute
   '/api/public/extension-version': typeof ApiPublicExtensionVersionRoute
+  '/api/public/download/$platform': typeof ApiPublicDownloadPlatformRoute
   '/api/public/hooks/cleanup-screenshots': typeof ApiPublicHooksCleanupScreenshotsRoute
 }
 export interface FileRoutesById {
@@ -207,6 +216,7 @@ export interface FileRoutesById {
   '/admin_/invoices/$invoiceId': typeof AdminInvoicesInvoiceIdRoute
   '/api/public/desktop-version': typeof ApiPublicDesktopVersionRoute
   '/api/public/extension-version': typeof ApiPublicExtensionVersionRoute
+  '/api/public/download/$platform': typeof ApiPublicDownloadPlatformRoute
   '/api/public/hooks/cleanup-screenshots': typeof ApiPublicHooksCleanupScreenshotsRoute
 }
 export interface FileRouteTypes {
@@ -232,6 +242,7 @@ export interface FileRouteTypes {
     | '/admin/invoices/$invoiceId'
     | '/api/public/desktop-version'
     | '/api/public/extension-version'
+    | '/api/public/download/$platform'
     | '/api/public/hooks/cleanup-screenshots'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -255,6 +266,7 @@ export interface FileRouteTypes {
     | '/admin/invoices/$invoiceId'
     | '/api/public/desktop-version'
     | '/api/public/extension-version'
+    | '/api/public/download/$platform'
     | '/api/public/hooks/cleanup-screenshots'
   id:
     | '__root__'
@@ -278,6 +290,7 @@ export interface FileRouteTypes {
     | '/admin_/invoices/$invoiceId'
     | '/api/public/desktop-version'
     | '/api/public/extension-version'
+    | '/api/public/download/$platform'
     | '/api/public/hooks/cleanup-screenshots'
   fileRoutesById: FileRoutesById
 }
@@ -302,6 +315,7 @@ export interface RootRouteChildren {
   AdminInvoicesInvoiceIdRoute: typeof AdminInvoicesInvoiceIdRoute
   ApiPublicDesktopVersionRoute: typeof ApiPublicDesktopVersionRoute
   ApiPublicExtensionVersionRoute: typeof ApiPublicExtensionVersionRoute
+  ApiPublicDownloadPlatformRoute: typeof ApiPublicDownloadPlatformRoute
   ApiPublicHooksCleanupScreenshotsRoute: typeof ApiPublicHooksCleanupScreenshotsRoute
 }
 
@@ -454,6 +468,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksCleanupScreenshotsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/download/$platform': {
+      id: '/api/public/download/$platform'
+      path: '/api/public/download/$platform'
+      fullPath: '/api/public/download/$platform'
+      preLoaderRoute: typeof ApiPublicDownloadPlatformRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -478,6 +499,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminInvoicesInvoiceIdRoute: AdminInvoicesInvoiceIdRoute,
   ApiPublicDesktopVersionRoute: ApiPublicDesktopVersionRoute,
   ApiPublicExtensionVersionRoute: ApiPublicExtensionVersionRoute,
+  ApiPublicDownloadPlatformRoute: ApiPublicDownloadPlatformRoute,
   ApiPublicHooksCleanupScreenshotsRoute: ApiPublicHooksCleanupScreenshotsRoute,
 }
 export const routeTree = rootRouteImport

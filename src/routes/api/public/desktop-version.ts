@@ -15,12 +15,12 @@ export const Route = createFileRoute("/api/public/desktop-version")({
             latest: DESKTOP_VERSION,
             min: MIN_DESKTOP_VERSION,
             install_url: `${origin}/install`,
-            // Absolute GitHub Release asset URLs (see src/lib/desktop-version.ts).
+            // Absolute app-hosted installer URLs. GitHub release assets are not
+            // public for private repositories.
             downloads: {
-              windows: DESKTOP_DOWNLOADS.windows,
-              mac_arm64: DESKTOP_DOWNLOADS.macArm,
-              mac_x64: DESKTOP_DOWNLOADS.macIntel,
-              linux: DESKTOP_DOWNLOADS.linux,
+              windows: new URL(DESKTOP_DOWNLOADS.windows, origin).toString(),
+              mac: new URL(DESKTOP_DOWNLOADS.mac, origin).toString(),
+              linux: new URL(DESKTOP_DOWNLOADS.linux, origin).toString(),
             },
           },
           {

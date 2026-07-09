@@ -157,6 +157,7 @@ export type Database = {
           idle_threshold_sec: number
           low_engagement_minutes: number
           max_break_sec: number
+          screenshot_interval_minutes: number
           screenshot_retention_days: number
           session_timeout_minutes: number
           updated_at: string
@@ -173,6 +174,7 @@ export type Database = {
           idle_threshold_sec?: number
           low_engagement_minutes?: number
           max_break_sec?: number
+          screenshot_interval_minutes?: number
           screenshot_retention_days?: number
           session_timeout_minutes?: number
           updated_at?: string
@@ -189,6 +191,7 @@ export type Database = {
           idle_threshold_sec?: number
           low_engagement_minutes?: number
           max_break_sec?: number
+          screenshot_interval_minutes?: number
           screenshot_retention_days?: number
           session_timeout_minutes?: number
           updated_at?: string

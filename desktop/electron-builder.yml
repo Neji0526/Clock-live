@@ -35,26 +35,37 @@ nsis:
   artifactName: ClockWork-Setup-${version}.${ext}
 
 mac:
-  # Ship two per-arch DMGs — arm64 (Apple Silicon) and x64 (Intel).
-  # Building only the CI runner's arch (macos-latest is now Apple Silicon)
-  # produced an arm64-only DMG that Intel Macs reject with "not supported on
-  # this Mac". A single "universal" DMG is nicer UX but its @electron/universal
-  # merge step chokes on active-win's native helper, so we build the two arches
-  # separately instead — no merge, both CPU families covered.
+  # Universal = one app bundle holding BOTH arm64 (Apple Silicon) and x64
+  # (Intel) slices, so a single .dmg runs on every Mac. Without this,
+  # electron-builder builds only for the CI runner's arch (arm64 on
+  # macos-latest), which fails on Intel Macs with "not supported on this Mac".
   target:
     - target: dmg
       arch:
-        - arm64
-        - x64
+        - universal
+  # On macOS active-win uses ONLY its prebuilt universal Mach-O `main` binary
+  # (lib/macos.js spawns it via child_process). It never loads the native
+  # `.node` addon on darwin. But active-win ships those .node addons for BOTH
+  # arches (lib/binding/napi-6-darwin-unknown-{arm64,x64}), and @electron/
+  # universal tries to lipo-merge them across the x64/arm64 app builds — which
+  # fails ("same architectures (arm64) ... can't be in the same fat file"),
+  # plus the node-gyp rebuild leaves non-Mach-O intermediates that also can't
+  # be reconciled. None are used at runtime on macOS, so strip every .node
+  # addon + build intermediate here. (mac-only: Windows still needs its addon.)
+  files:
+    - "!**/node_modules/active-win/**/*.node"
+    - "!**/node_modules/active-win/build/**"
+    - "!**/node_modules/active-win/build-tmp-*/**"
+    - "!**/node_modules/active-win/lib/binding/**"
   category: public.app-category.productivity
   icon: build/icon.png
-  artifactName: ClockWork-${version}-${arch}.${ext}
+  artifactName: ClockWork-${version}.${ext}
   # desktopCapturer + active-win need Screen Recording permission on macOS.
   extendInfo:
     NSCameraUsageDescription: ClockWork captures periodic screenshots while you are clocked in.
 
 dmg:
-  artifactName: ClockWork-${version}-${arch}.${ext}
+  artifactName: ClockWork-${version}.${ext}
 
 linux:
   # AppImage only — the portable, runnable Linux file. The .deb target needs

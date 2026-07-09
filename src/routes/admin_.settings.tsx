@@ -242,6 +242,7 @@ function SettingsPanel() {
   const [maxBreakMin, setMaxBreakMin] = useState<number>(60);
   const [lowEngageMin, setLowEngageMin] = useState<number>(10);
   const [sessionTimeoutMin, setSessionTimeoutMin] = useState<number>(10);
+  const [shotMin, setShotMin] = useState<number>(10);
   const [busy, setBusy] = useState(false);
 
   const q = useQuery({
@@ -249,7 +250,7 @@ function SettingsPanel() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("app_config")
-        .select("screenshot_retention_days, idle_threshold_sec, max_break_sec, low_engagement_minutes, session_timeout_minutes, updated_at")
+        .select("screenshot_retention_days, idle_threshold_sec, max_break_sec, low_engagement_minutes, session_timeout_minutes, screenshot_interval_minutes, updated_at")
         .eq("id", 1)
         .maybeSingle();
       if (error) throw error;
@@ -263,7 +264,8 @@ function SettingsPanel() {
     if (q.data?.max_break_sec) setMaxBreakMin(Math.round(q.data.max_break_sec / 60));
     if ((q.data as any)?.low_engagement_minutes) setLowEngageMin((q.data as any).low_engagement_minutes);
     if ((q.data as any)?.session_timeout_minutes) setSessionTimeoutMin((q.data as any).session_timeout_minutes);
-  }, [q.data?.screenshot_retention_days, q.data?.idle_threshold_sec, q.data?.max_break_sec, (q.data as any)?.low_engagement_minutes, (q.data as any)?.session_timeout_minutes]);
+    if ((q.data as any)?.screenshot_interval_minutes) setShotMin((q.data as any).screenshot_interval_minutes);
+  }, [q.data?.screenshot_retention_days, q.data?.idle_threshold_sec, q.data?.max_break_sec, (q.data as any)?.low_engagement_minutes, (q.data as any)?.session_timeout_minutes, (q.data as any)?.screenshot_interval_minutes]);
 
   const save = useCallback(async () => {
     const n = Math.max(1, Math.min(3650, Math.floor(days)));
@@ -271,6 +273,7 @@ function SettingsPanel() {
     const mb = Math.max(300, Math.min(14400, Math.floor(maxBreakMin * 60)));
     const le = Math.max(2, Math.min(120, Math.floor(lowEngageMin)));
     const st = Math.max(2, Math.min(240, Math.floor(sessionTimeoutMin)));
+    const si = Math.max(1, Math.min(60, Math.floor(shotMin)));
     setBusy(true);
     try {
       const { error } = await supabase
@@ -281,6 +284,7 @@ function SettingsPanel() {
           max_break_sec: mb,
           low_engagement_minutes: le,
           session_timeout_minutes: st,
+          screenshot_interval_minutes: si,
           updated_at: new Date().toISOString(),
         } as any)
         .eq("id", 1);
@@ -291,14 +295,15 @@ function SettingsPanel() {
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to save");
     } finally { setBusy(false); }
-  }, [days, idleMin, maxBreakMin, lowEngageMin, sessionTimeoutMin, qc]);
+  }, [days, idleMin, maxBreakMin, lowEngageMin, sessionTimeoutMin, shotMin, qc]);
 
   const dirty = !!(q.data && (
     days !== q.data.screenshot_retention_days ||
     idleMin !== Math.round((q.data.idle_threshold_sec ?? 300) / 60) ||
     maxBreakMin !== Math.round((q.data.max_break_sec ?? 3600) / 60) ||
     lowEngageMin !== ((q.data as any).low_engagement_minutes ?? 10) ||
-    sessionTimeoutMin !== ((q.data as any).session_timeout_minutes ?? 10)
+    sessionTimeoutMin !== ((q.data as any).session_timeout_minutes ?? 10) ||
+    shotMin !== ((q.data as any).screenshot_interval_minutes ?? 10)
   ));
 
   useRegisterDirtySection("workspace", {
@@ -372,12 +377,21 @@ function SettingsPanel() {
               <span className="text-xs text-muted-foreground">min</span>
             </div>
           </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="shot-interval" className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Screenshot every</Label>
+            <div className="flex items-baseline gap-2">
+              <Input id="shot-interval" type="number" min={1} max={60} value={shotMin}
+                onChange={(e) => setShotMin(Number(e.target.value))} className="w-24 h-10 text-lg tabular-nums" />
+              <span className="text-xs text-muted-foreground">min</span>
+            </div>
+          </div>
         </div>
         <p className="text-xs text-muted-foreground leading-relaxed">
           Idle threshold controls when ClockWork nudges a member to confirm they're still working.
           The break warning fires when a single break exceeds the configured length.
           Low-engagement flags stretches where a member is clocked in and active but registers no clicks, typing, or scrolling for at least this many minutes (counts only — never keystrokes or text).
           Session timeout auto-ends a session after this many minutes with no activity (browser closed, machine asleep, extension stopped) — recorded hours are capped at the last real activity, not the idle gap.
+          Screenshot interval sets how often the desktop app captures a screenshot while a member is clocked in — applied on Windows, Linux, and macOS. The desktop app picks up changes within a few minutes.
         </p>
 
         <div className="flex items-center gap-3 pt-1 border-t border-border/60">

@@ -4,15 +4,57 @@ import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useRealtimeInvalidate } from "@/hooks/use-realtime-invalidate";
 import {
-  Download, Monitor, Apple, Terminal, ShieldCheck, Copy, Check, Pin, FolderOpen,
+  Download, Monitor, ShieldCheck, Copy, Check, Pin, FolderOpen,
   ArrowRight, CircleDashed, Clock, Puzzle, Sparkles, BookOpen, LayoutDashboard, RefreshCw,
 } from "lucide-react";
+import { FaApple, FaLinux, FaWindows } from "react-icons/fa";
 
 import { DESKTOP_VERSION, DESKTOP_DOWNLOADS } from "@/lib/desktop-version";
+import { toast } from "sonner";
+
+type OS = "windows" | "mac" | "linux";
+
+// Best-effort OS detection so we can pre-highlight the matching download button.
+// Defaults to "windows" when unknown (and during SSR, where `navigator` is
+// absent) so the first paint is deterministic — a client-side effect corrects
+// it after mount.
+function detectOS(): OS {
+  if (typeof navigator === "undefined") return "windows";
+  const uaData = (navigator as unknown as { userAgentData?: { platform?: string } }).userAgentData;
+  const hay = `${uaData?.platform ?? ""} ${navigator.platform ?? ""} ${navigator.userAgent ?? ""}`.toLowerCase();
+  if (/mac|iphone|ipad|ipod/.test(hay)) return "mac";
+  if (/linux|android|cros/.test(hay)) return "linux";
+  return "windows";
+}
+
+// Fetch the same-origin installer as a blob, then click a synthetic anchor so
+// the browser starts a Save dialog instead of trying to render the file.
+async function downloadInstaller(url: string) {
+  const filename = url.split("/").pop() || "clockwork-installer";
+  try {
+    const res = await fetch(url, { mode: "cors", credentials: "omit" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  } catch (err) {
+    console.warn("[install] blob download failed, falling back to new tab", err);
+    window.open(url, "_blank", "noopener,noreferrer");
+    toast.message("Opening download in a new tab", {
+      description: "If it doesn't start automatically, use Save as from the new tab.",
+    });
+  }
+}
 
 export const Route = createFileRoute("/install")({
   head: () => ({
@@ -62,6 +104,11 @@ function Install() {
 
   const connected = !!verifyQ.data?.connected;
   const [forceReinstall, setForceReinstall] = useState(false);
+
+  // Pre-highlight the download button matching the visitor's OS. Starts at the
+  // SSR-safe default and is corrected on the client after mount.
+  const [os, setOs] = useState<OS>("windows");
+  useEffect(() => { setOs(detectOS()); }, []);
 
   if (connected && !forceReinstall) {
     return <ConnectedHero lastSeen={verifyQ.data?.lastSeen ?? null} onReinstall={() => setForceReinstall(true)} />;
@@ -159,31 +206,20 @@ function Install() {
           subtitle="Pick your operating system. It installs like any normal desktop app — no Chrome needed."
           done={connected}
         >
-          <div className="grid sm:grid-cols-2 gap-3 max-w-2xl">
-            <Button asChild size="lg" className="press justify-start">
-              <a href={DESKTOP_DOWNLOADS.windows} download>
-                <Monitor className="size-4 mr-2" /> Windows (.exe)
-              </a>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl">
+            <Button size="lg" variant={os === "windows" ? "default" : "outline"} className="press justify-start min-w-0 px-4" onClick={() => downloadInstaller(DESKTOP_DOWNLOADS.windows)}>
+              <FaWindows className="size-4 mr-2" /> <span className="truncate min-w-0">Windows (.exe)</span>
             </Button>
-            <Button asChild size="lg" variant="outline" className="press justify-start">
-              <a href={DESKTOP_DOWNLOADS.macArm} download>
-                <Apple className="size-4 mr-2" /> macOS · Apple Silicon (.dmg)
-              </a>
+            <Button size="lg" variant={os === "mac" ? "default" : "outline"} className="press justify-start min-w-0 px-4" onClick={() => downloadInstaller(DESKTOP_DOWNLOADS.mac)}>
+              <FaApple className="size-4 mr-2" /> <span className="truncate min-w-0">macOS (.dmg)</span>
             </Button>
-            <Button asChild size="lg" variant="outline" className="press justify-start">
-              <a href={DESKTOP_DOWNLOADS.macIntel} download>
-                <Apple className="size-4 mr-2" /> macOS · Intel (.dmg)
-              </a>
-            </Button>
-            <Button asChild size="lg" variant="outline" className="press justify-start">
-              <a href={DESKTOP_DOWNLOADS.linux} download>
-                <Terminal className="size-4 mr-2" /> Linux (.AppImage)
-              </a>
+            <Button size="lg" variant={os === "linux" ? "default" : "outline"} className="press justify-start min-w-0 px-4" onClick={() => downloadInstaller(DESKTOP_DOWNLOADS.linux)}>
+              <FaLinux className="size-4 mr-2" /> <span className="truncate min-w-0">Linux (.AppImage)</span>
             </Button>
           </div>
           <div className="mt-3 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground font-mono">
             <span className="px-1.5 py-0.5 rounded bg-muted border border-border">v{DESKTOP_VERSION}</span>
-            <span>latest release · Windows, macOS &amp; Linux</span>
+              <span>latest release · Windows, macOS &amp; Linux</span>
           </div>
         </Step>
 
@@ -200,19 +236,16 @@ function Install() {
               <code className="px-1.5 py-0.5 rounded bg-muted text-[11px] font-mono">ClockWork-Setup.exe</code>{" "}
               and follow the installer. Launch it from the Start menu.
             </SubStep>
-            <SubStep icon={<Apple className="size-3.5" />}>
-              <span className="font-medium text-foreground">macOS:</span> pick{" "}
-              <span className="font-medium text-foreground">Apple Silicon</span> (M1/M2/M3+) or{" "}
-              <span className="font-medium text-foreground">Intel</span> — check via  Apple menu → About This Mac.
-              Open the{" "}
+            <SubStep icon={<FaApple className="size-3.5" />}>
+              <span className="font-medium text-foreground">macOS:</span> open the{" "}
               <code className="px-1.5 py-0.5 rounded bg-muted text-[11px] font-mono">.dmg</code>{" "}
               and drag ClockWork into Applications. On first launch, allow{" "}
               <span className="font-medium text-foreground">Screen Recording</span> in System Settings so screenshots work.
             </SubStep>
-            <SubStep icon={<Terminal className="size-3.5" />}>
+            <SubStep icon={<FaLinux className="size-3.5" />}>
               <span className="font-medium text-foreground">Linux:</span> mark the{" "}
               <code className="px-1.5 py-0.5 rounded bg-muted text-[11px] font-mono">.AppImage</code>{" "}
-              executable and run it (or install the <code className="px-1.5 py-0.5 rounded bg-muted text-[11px] font-mono">.deb</code>).
+              executable and run it.
             </SubStep>
           </ol>
         </Step>

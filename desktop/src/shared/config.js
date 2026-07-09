@@ -13,7 +13,11 @@ const AUTH_URL = `${SUPABASE_URL}/auth/v1/token`;
 
 const DEFAULTS = {
   idleSeconds: 300,
-  shotMinutes: 5,
+  // Screenshot capture interval (minutes). This is the pre-sync fallback only —
+  // the authoritative value comes from the admin's app_config.screenshot_interval_minutes,
+  // which the agent fetches and writes over settings.shotMinutes on clock-in and
+  // periodically thereafter (see core.js fetchServerConfig).
+  shotMinutes: 10,
   workflowGapSec: 30,
   workflowMaxSteps: 25,
   // session timeout (minutes) for sleep/wake recovery — must match server default

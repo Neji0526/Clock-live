@@ -178,7 +178,7 @@ export function AdminOnboardingChecklist({ userId }: { userId: string }) {
             <p className="text-xs text-muted-foreground mt-1 max-w-md">
               {allDone
                 ? "Nice. This card will tuck itself away in a moment."
-                : "Tick these off in any order — we'll mark them as you go."}
+                : "Tick these off in any order — we'll mark them as you go. "}
             </p>
           </div>
         </div>

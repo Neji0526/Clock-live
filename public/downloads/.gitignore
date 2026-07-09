@@ -1,7 +1,6 @@
-# Installer binaries are published to GitHub Releases by CI, not committed here.
-*.exe
-*.dmg
-*.AppImage
-*.deb
-*.blockmap
-*.zip
+# All desktop installers are streamed by the app from the private GitHub
+# Release (tag: release-desktop-apps) via /api/public/download/<platform>.
+# Nothing should be committed into this folder.
+*
+!.gitignore
+!README.md

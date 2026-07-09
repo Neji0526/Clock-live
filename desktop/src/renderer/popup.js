@@ -92,9 +92,44 @@ function toast(msg) {
   t._h = setTimeout(() => t.classList.add("hidden"), 1800);
 }
 
+// In-popup confirmation. Replaces window.confirm(), which on the Linux tray
+// build steals focus (firing the main-process blur→hide) and blocks the single
+// renderer thread while its own dialog is hidden and unanswerable — freezing
+// every button. This overlay lives inside the popup DOM: no focus change, no
+// blocking, so the UI stays responsive and reopening the popup can't strand it.
+function askConfirm(message, okLabel = "Confirm") {
+  return new Promise((resolve) => {
+    document.querySelectorAll(".cw-confirm").forEach((n) => n.remove());
+    const ov = document.createElement("div");
+    ov.className = "cw-confirm";
+    ov.innerHTML = `
+      <div class="cw-confirm-card">
+        <div class="cw-confirm-msg"></div>
+        <div class="cw-confirm-row">
+          <button class="ghost cw-cancel" type="button">Cancel</button>
+          <button class="stop cw-ok" type="button"></button>
+        </div>
+      </div>`;
+    ov.querySelector(".cw-confirm-msg").textContent = message;
+    ov.querySelector(".cw-ok").textContent = okLabel;
+    const done = (val) => { ov.remove(); resolve(val); };
+    ov.querySelector(".cw-cancel").onclick = () => done(false);
+    ov.querySelector(".cw-ok").onclick = () => done(true);
+    // Click the dark backdrop = cancel; Esc = cancel.
+    ov.addEventListener("click", (e) => { if (e.target === ov) done(false); });
+    const onKey = (e) => {
+      if (e.key === "Escape") { document.removeEventListener("keydown", onKey); done(false); }
+    };
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(ov);
+    ov.querySelector(".cw-ok").focus();
+  });
+}
+
 let tick = null;
 let st = null;
 let clockingOut = false; // guards the RUNNING→STOPPING→STOPPED transition
+let clockingIn = false;  // guards the STOPPED→STARTING→RUNNING transition
 let clientName = "No client";
 let clientsCache = [];
 let clientsLoaded = false;
@@ -188,6 +223,12 @@ async function render() {
       const b = $(id);
       if (b) { b.disabled = false; b.textContent = "■  Clock Out"; }
     }
+  }
+  // Same self-heal for Clock In: unless a start is genuinely mid-flight, keep it
+  // clickable so a reopened popup is never stranded on a stuck "Starting…".
+  if (!clockingIn) {
+    const b = $("clockInBtn");
+    if (b) { b.disabled = false; b.innerHTML = "▶  Clock In"; }
   }
 
   // Signed out
@@ -311,20 +352,33 @@ document.addEventListener("DOMContentLoaded", () => {
   $("footLogout2").onclick = async () => { await send("wt-logout"); await refresh(); };
 
   $("clockInBtn").onclick = async () => {
+    if (clockingIn) return;
     const sel = $("client");
     const clientId = sel ? sel.value : "";
     await clockwork.storage.local.set({ wtLastClient: clientId });
+    clockingIn = true;
     $("clockInBtn").disabled = true; $("clockInBtn").textContent = "Starting…";
-    const r = await send("wt-clock-in", { clientId: clientId || null });
-    $("clockInBtn").disabled = false; $("clockInBtn").innerHTML = "▶  Clock In";
-    if (r && r.error) { toast(r.error); return; }
-    toast("Clocked in ✓");
-    await refresh();
+    try {
+      // Timeout-guard the round-trip so a stalled IPC can never leave the button
+      // hung on "Starting…" (the finally always restores it).
+      const r = await Promise.race([
+        send("wt-clock-in", { clientId: clientId || null }),
+        new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 15000)),
+      ]);
+      if (r && r.error) { toast(r.error); return; }
+      toast("Clocked in ✓");
+      await refresh();
+    } catch (e) {
+      toast(e && e.message === "timeout" ? "Start timed out — try again" : "Couldn't clock in — try again");
+    } finally {
+      clockingIn = false;
+      $("clockInBtn").disabled = false; $("clockInBtn").innerHTML = "▶  Clock In";
+    }
   };
 
   async function doClockOut(btn) {
     if (clockingOut) return;
-    if (!confirm("Clock out and end this session?")) return;
+    if (!(await askConfirm("Clock out and end this session?", "Clock Out"))) return;
     // RUNNING → STOPPING
     clockingOut = true;
     btn.disabled = true; btn.textContent = "Stopping…";
@@ -359,23 +413,33 @@ document.addEventListener("DOMContentLoaded", () => {
 
   $("pauseBtn").onclick = async () => {
     $("pauseBtn").disabled = true;
-    await send("wt-toggle-pause", { breakType: "short_break" });
-    $("pauseBtn").disabled = false;
-    await refresh();
+    try {
+      await send("wt-toggle-pause", { breakType: "short_break" });
+      await refresh();
+    } finally {
+      $("pauseBtn").disabled = false;
+    }
   };
 
   $("lunchBtn").onclick = async () => {
     $("lunchBtn").disabled = true;
-    await send("wt-toggle-pause", { breakType: "lunch" });
-    $("lunchBtn").disabled = false;
-    await refresh();
+    try {
+      await send("wt-toggle-pause", { breakType: "lunch" });
+      await refresh();
+    } finally {
+      $("lunchBtn").disabled = false;
+    }
   };
 
   $("resumeBtn").onclick = async () => {
     $("resumeBtn").disabled = true; $("resumeBtn").textContent = "Resuming…";
-    await send("wt-toggle-pause");
-    toast("Resumed ✓");
-    await refresh();
+    try {
+      await send("wt-toggle-pause");
+      toast("Resumed ✓");
+      await refresh();
+    } finally {
+      $("resumeBtn").disabled = false; $("resumeBtn").innerHTML = "▶  Resume work";
+    }
   };
 
   $("retryBtn").onclick = async () => {

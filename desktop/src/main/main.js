@@ -85,7 +85,12 @@ function createPopup() {
   popupWin.loadFile(path.join(RENDERER, "popup.html"));
   // Hide (don't destroy) on blur, mirroring a toolbar popup dismiss.
   popupWin.on("blur", () => {
-    if (popupWin && !popupWin.webContents.isDevToolsOpened()) popupWin.hide();
+    if (!popupWin || popupWin.webContents.isDevToolsOpened()) return;
+    // Don't auto-dismiss while a modal/child window (e.g. a native dialog) is
+    // open: on Linux that would hide the popup out from under its own dialog and
+    // strand the UI. Only hide when focus truly left ClockWork for another app.
+    if (typeof popupWin.getChildWindows === "function" && popupWin.getChildWindows().length > 0) return;
+    popupWin.hide();
   });
   popupWin.on("closed", () => {
     popupWin = null;

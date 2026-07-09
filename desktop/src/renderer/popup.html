@@ -116,9 +116,6 @@
 
   .toast{ position:absolute; left:50%; top:14px; transform:translateX(-50%); background:rgba(34,197,94,.95); color:#062812; padding:8px 14px; border-radius:999px; font-size:12px; font-weight:700; box-shadow:var(--shadow); animation: pop .3s ease-out; z-index:50; }
   @keyframes pop{ from{opacity:0; transform:translate(-50%,-8px);} to{opacity:1; transform:translate(-50%,0);} }
-
-  /* In-popup confirm (replaces window.confirm, which steals focus and, on the
-     Linux tray build, blocks the renderer thread and freezes the whole UI). */
   .cw-confirm{ position:absolute; inset:0; background:rgba(6,8,12,.74); display:flex; align-items:center; justify-content:center; z-index:100; padding:18px; animation: fade .18s ease-out; }
   .cw-confirm-card{ background:linear-gradient(180deg,var(--card),var(--card2)); border:1px solid var(--line2); border-radius:14px; padding:16px; box-shadow:var(--shadow); width:100%; }
   .cw-confirm-msg{ font-size:14px; color:var(--txt); margin-bottom:14px; text-align:center; line-height:1.5; }

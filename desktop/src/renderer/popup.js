@@ -224,7 +224,7 @@ async function render() {
       if (b) { b.disabled = false; b.textContent = "■  Clock Out"; }
     }
   }
-  // Same self-heal for Clock In: unless a start is genuinely mid-flight, keep it
+// Same self-heal for Clock In: unless a start is genuinely mid-flight, keep it
   // clickable so a reopened popup is never stranded on a stuck "Starting…".
   if (!clockingIn) {
     const b = $("clockInBtn");
@@ -358,6 +358,11 @@ document.addEventListener("DOMContentLoaded", () => {
     await clockwork.storage.local.set({ wtLastClient: clientId });
     clockingIn = true;
     $("clockInBtn").disabled = true; $("clockInBtn").textContent = "Starting…";
+    // const r = await send("wt-clock-in", { clientId: clientId || null });
+    // $("clockInBtn").disabled = false; $("clockInBtn").innerHTML = "▶  Clock In";
+    // if (r && r.error) { toast(r.error); return; }
+    // toast("Clocked in ✓");
+    // await refresh();
     try {
       // Timeout-guard the round-trip so a stalled IPC can never leave the button
       // hung on "Starting…" (the finally always restores it).
@@ -379,6 +384,11 @@ document.addEventListener("DOMContentLoaded", () => {
   async function doClockOut(btn) {
     if (clockingOut) return;
     if (!(await askConfirm("Clock out and end this session?", "Clock Out"))) return;
+    // NOTE: deliberately no window.confirm() here. confirm() blocks the renderer
+    // thread synchronously; on Linux the frameless/skipTaskbar popup hides itself
+    // on blur when the dialog steals focus, so no dialog is ever shown and the UI
+    // freezes permanently ("disabled, can't touch the app"). Clock Out is an
+    // explicit, distinctly-styled action — stop immediately instead.
     // RUNNING → STOPPING
     clockingOut = true;
     btn.disabled = true; btn.textContent = "Stopping…";
@@ -413,6 +423,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   $("pauseBtn").onclick = async () => {
     $("pauseBtn").disabled = true;
+    // await send("wt-toggle-pause", { breakType: "short_break" });
+    // $("pauseBtn").disabled = false;
+    // await refresh();
     try {
       await send("wt-toggle-pause", { breakType: "short_break" });
       await refresh();
@@ -423,6 +436,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   $("lunchBtn").onclick = async () => {
     $("lunchBtn").disabled = true;
+    // await send("wt-toggle-pause", { breakType: "lunch" });
+    // $("lunchBtn").disabled = false;
+    // await refresh();
     try {
       await send("wt-toggle-pause", { breakType: "lunch" });
       await refresh();
@@ -433,6 +449,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   $("resumeBtn").onclick = async () => {
     $("resumeBtn").disabled = true; $("resumeBtn").textContent = "Resuming…";
+    // await send("wt-toggle-pause");
+    // toast("Resumed ✓");
+    // await refresh();
     try {
       await send("wt-toggle-pause");
       toast("Resumed ✓");

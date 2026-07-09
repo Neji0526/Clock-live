@@ -85,6 +85,7 @@ function createPopup() {
   popupWin.loadFile(path.join(RENDERER, "popup.html"));
   // Hide (don't destroy) on blur, mirroring a toolbar popup dismiss.
   popupWin.on("blur", () => {
+    // if (popupWin && !popupWin.webContents.isDevToolsOpened()) popupWin.hide();
     if (!popupWin || popupWin.webContents.isDevToolsOpened()) return;
     // Don't auto-dismiss while a modal/child window (e.g. a native dialog) is
     // open: on Linux that would hide the popup out from under its own dialog and

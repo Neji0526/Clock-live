@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Square, Circle, Clock, BookOpen, Chrome, Globe, Briefcase, Camera, MousePointerClick, CheckCircle2, Circle as CircleEmpty, ShieldCheck, Eye, Coffee, Play, TrendingUp } from "lucide-react";
+import { Square, Circle, Clock, BookOpen, Globe, Briefcase, Camera, MousePointerClick, CheckCircle2, Circle as CircleEmpty, ShieldCheck, Eye, Coffee, Play, TrendingUp } from "lucide-react";
+import { FaChrome } from "react-icons/fa";
 import { fmtClock, fmtDuration, fmtHoursHuman, fmtSecHuman, hostOf } from "@/lib/format";
 import { toast } from "sonner";
 import { Link } from "@tanstack/react-router";
@@ -861,7 +862,7 @@ export function VaHome() {
           <span aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold/60 to-transparent" />
           <div className="relative z-10 max-w-3xl mx-auto text-center space-y-6">
             <div className="mx-auto size-14 rounded-full bg-white/[0.06] ring-1 ring-white/15 grid place-items-center backdrop-blur-sm">
-              <Chrome className="size-7 text-gold" />
+              <FaChrome className="size-7 text-gold" />
             </div>
             <div className="space-y-2">
               <div className="text-[11px] uppercase tracking-[0.22em] text-gold/90 font-medium">Off the clock</div>
@@ -906,7 +907,7 @@ export function VaHome() {
 
             <div className="flex flex-wrap justify-center gap-2 pt-1">
               <Button asChild size="sm" className="press">
-                <Link to="/install"><Chrome className="size-4 mr-1.5" />Install extension</Link>
+                <Link to="/install"><FaChrome className="size-4 mr-1.5" />Install extension</Link>
               </Button>
               <Button asChild variant="outline" size="sm" className="bg-white/5 border-white/15 text-white hover:bg-white/10 hover:text-white">
                 <Link to="/consent"><Eye className="size-4 mr-1.5" />What gets tracked?</Link>

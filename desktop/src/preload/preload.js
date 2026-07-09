@@ -1,4 +1,4 @@
-// Preload for the popup + options windows — the secure context bridge.
+// Preload for the popup window — the secure context bridge.
 //
 // Exposes a minimal, namespaced `window.clockwork` API (same shape the renderer
 // expects) backed by ipcRenderer. It is deliberately NOT named `chrome`:
@@ -29,7 +29,6 @@ const api = {
       }
       return p;
     },
-    openOptionsPage: () => ipcRenderer.invoke("open-options"),
     getManifest: () => ({ version: APP_VERSION }),
   },
   storage: {

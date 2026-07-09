@@ -1,26 +1,37 @@
 name: Build ClockWork Desktop
 
-# Builds all three installers on their native OS runners (macOS .dmg can only be
-# produced on a macOS runner), then publishes them to a GitHub Release so the
-# web app can link to stable download URLs.
-#
-# Trigger: push a tag like `desktop-v1.0.0`, or run manually (Actions -> Run).
+# Builds Windows / macOS / Linux installers and publishes them to a rolling
+# GitHub Release (tag: release-desktop-apps) in this PRIVATE repository.
+# The web app streams these assets to end users via
+# /api/public/download/<platform>, authenticating with GITHUB_RELEASE_TOKEN.
+# We do NOT commit installers into the repo — files are >100 MB and would
+# be rejected by GitHub's push limits.
 on:
   workflow_dispatch: {}
   push:
-    tags:
-      - "desktop-v*"
+    branches:
+      - main
+    paths:
+      - "desktop/**"
+      - "src/lib/desktop-version.ts"
+      - ".github/workflows/desktop-build.yml"
+
+env:
+  RELEASE_TAG: release-desktop-apps
 
 permissions:
-  contents: write # needed to create/update the Release
+  contents: write
+
+concurrency:
+  group: desktop-build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     strategy:
       fail-fast: false
       matrix:
-        # ubuntu-22.04 (not ubuntu-latest/24.04): electron-builder's AppImage
-        # tooling reliably fails on 24.04. 22.04 is the known-good runner.
+        # ubuntu-22.04 is the known-good runner for electron-builder AppImage.
         os: [windows-latest, macos-latest, ubuntu-22.04]
     runs-on: ${{ matrix.os }}
     defaults:
@@ -32,52 +43,69 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
 
       - name: Install Linux packaging deps
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libarchive-tools fakeroot
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build distributable
-        # NOTE: do NOT pass a GitHub token here. electron-builder auto-publishes
-        # on CI when a token + tag are present, and with no publish config that
-        # step fails. We publish separately in the `release` job below, so force
-        # publishing off here.
         run: npm run build -- --publish never
         env:
-          # We don't ship Apple/Windows code-signing certs — don't try to sign.
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Upload installers (workflow artifacts)
         uses: actions/upload-artifact@v4
         with:
-          name: clockwork-${{ matrix.os }}
+          name: clockwork-${{ runner.os }}
           path: |
             desktop/dist/*.exe
             desktop/dist/*.dmg
             desktop/dist/*.AppImage
-            desktop/dist/*.deb
-          if-no-files-found: ignore
+          if-no-files-found: error
 
-  release:
-    # Publish a single Release with every OS's installer, only for tag pushes.
-    # `always()` so that if one OS leg fails, we still publish the installers
-    # that DID build (a single flaky platform never blocks the others).
+  publish-release:
     needs: build
-    if: ${{ always() && startsWith(github.ref, 'refs/tags/') }}
+    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Publish GitHub Release
+      - name: Stage release assets
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./desktop/package.json').version")"
+          mkdir -p release-assets
+          find artifacts -type f \( \
+            -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' \
+          \) -exec cp -v {} release-assets/ \;
+
+          test -f "release-assets/ClockWork-Setup-${VERSION}.exe"
+          test -f "release-assets/ClockWork-${VERSION}.dmg"
+          test -f "release-assets/ClockWork-${VERSION}.AppImage"
+
+          echo "--- release-assets ---"
+          ls -la release-assets/
+
+      - name: Publish rolling GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ClockWork Desktop ${{ github.ref_name }}
-          files: artifacts/**/*
-          fail_on_unmatched_files: false
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ClockWork Desktop (rolling)
+          body: |
+            Rolling release. Assets here are overwritten by CI on every
+            successful build from `main`. The web app streams these files
+            to end users via `/api/public/download/<platform>`.
+          files: release-assets/*
+          fail_on_unmatched_files: true
+          make_latest: "true"
+          prerelease: false

@@ -195,7 +195,6 @@
 
 @utility surface-glass {
   background: color-mix(in oklab, var(--background) 70%, transparent);
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
   backdrop-filter: blur(14px) saturate(140%);
   border-bottom: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
 }
@@ -389,7 +388,6 @@ html { scroll-behavior: smooth; }
     var(--foreground) 100%);
   -webkit-background-clip: text;
   background-clip: text;
-  -webkit-text-fill-color: transparent;
   color: transparent;
 }
 

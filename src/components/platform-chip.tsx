@@ -1,4 +1,5 @@
-import { Chrome, Monitor } from "lucide-react";
+import { Monitor } from "lucide-react";
+import { FaChrome } from "react-icons/fa";
 
 export type SourceLike = { source?: string | null; platform?: string | null } | null | undefined;
 
@@ -14,7 +15,7 @@ export function PlatformChip({ row, size = "sm" }: { row: SourceLike; size?: "xs
   const source = row?.source ?? "extension";
   const platform = row?.platform ?? "chrome";
   const isDesktop = source === "desktop";
-  const Icon = isDesktop ? Monitor : Chrome;
+  const Icon = isDesktop ? Monitor : FaChrome;
   const text = isDesktop ? `Desktop · ${PLATFORM_LABEL[platform] ?? platform}` : "Browser";
   const cls = isDesktop
     ? "border-primary/30 bg-primary/10 text-primary"

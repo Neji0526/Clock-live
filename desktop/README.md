@@ -29,12 +29,11 @@ desktop/
     │   ├── screenshot.js     chrome.tabs.captureVisibleTab → capturePage / desktopCapturer
     │   └── tray.js           chrome.action (toolbar badge) → Tray
     ├── preload/              SECURE BRIDGES (contextIsolation)
-    │   ├── preload.js        `chrome.*` shim for popup/options (IPC-backed)
+    │   ├── preload.js        `chrome.*` shim for the popup (IPC-backed)
     │   ├── browser-preload.js host bridge for the in-app browser window
     │   └── webview-preload.js migrated recorder.js (content script) for guest pages
     └── renderer/             RENDERER (existing UI, preserved)
         ├── popup.html/.js    verbatim from extension
-        ├── options.html/.js  verbatim from extension
         ├── recorder.js       reference copy (active copy lives in webview-preload.js)
         └── browser.html/.js  in-app browser (hybrid capture surface, new)
 ```
@@ -93,9 +92,9 @@ npm run build:mac     # ClockWork-<v>.dmg                  — must run on macOS
 Cross-OS note: a macOS `.dmg` can only be produced on macOS (Apple tooling).
 Use CI to build all three on native runners:
 `../.github/workflows/desktop-build.yml` (matrix: windows / macos / ubuntu).
-Publish the resulting installers to `public/downloads/` on the web app using the
-filenames in `src/lib/desktop-version.ts`; the `/install` page links to them and
-the app self-updates check hits `/api/public/desktop-version`.
+The workflow commits the resulting installers to `public/downloads/` using the
+filenames in `src/lib/desktop-version.ts`; the `/install` page links to those
+app-hosted files and the app self-update check hits `/api/public/desktop-version`.
 
 ## Native permissions
 

@@ -76,7 +76,7 @@ function renderUpdateBanner(viewId) {
   const link = div.querySelector(".upd-link");
   link.onclick = () => {
     if (installUrl) clockwork.tabs.create({ url: installUrl });
-    else toast("Set the dashboard URL in Settings");
+    else toast("No install URL available");
   };
   // Insert at top of wrap, after header if present.
   const hdr = wrap.querySelector(".hdr");
@@ -94,6 +94,7 @@ function toast(msg) {
 
 let tick = null;
 let st = null;
+let clockingOut = false; // guards the RUNNING→STOPPING→STOPPED transition
 let clientName = "No client";
 let clientsCache = [];
 let clientsLoaded = false;
@@ -136,7 +137,7 @@ async function onFootAct(e) {
     const { settings } = await clockwork.storage.local.get("settings");
     const url = (settings && settings.dashboardUrl) || "";
     if (url) clockwork.tabs.create({ url });
-    else toast("Set the dashboard URL in Settings");
+    else toast("No dashboard URL configured");
   } else if (act === "logout") {
     st = await send("wt-logout");
     await refresh();
@@ -177,6 +178,17 @@ function shotStatusText(st) {
 
 async function render() {
   if (!st) return;
+
+  // Never let a Clock Out button stay stuck reading "Stopping…": whenever we are
+  // not actively mid-stop, restore it to its clickable default. During a stop
+  // the `clockingOut` guard keeps the "Stopping…" label until the transition
+  // resolves (success → STOPPED view, or failure → re-enabled for retry).
+  if (!clockingOut) {
+    for (const id of ["clockOutBtn", "clockOutBtn2"]) {
+      const b = $(id);
+      if (b) { b.disabled = false; b.textContent = "■  Clock Out"; }
+    }
+  }
 
   // Signed out
   if (!st.loggedIn) {
@@ -310,14 +322,40 @@ document.addEventListener("DOMContentLoaded", () => {
     await refresh();
   };
 
-  $("clockOutBtn").onclick = async () => {
+  async function doClockOut(btn) {
+    if (clockingOut) return;
     if (!confirm("Clock out and end this session?")) return;
-    $("clockOutBtn").disabled = true; $("clockOutBtn").textContent = "Stopping…";
-    await send("wt-clock-out");
-    toast("Clocked out");
-    await refresh();
-  };
-  $("clockOutBtn2").onclick = $("clockOutBtn").onclick;
+    // RUNNING → STOPPING
+    clockingOut = true;
+    btn.disabled = true; btn.textContent = "Stopping…";
+    try {
+      // Guard the round-trip with a timeout so the button can never hang in
+      // "Stopping…" if the IPC/main call stalls. wt-clock-out resolves with the
+      // fresh status (rec already cleared) — verify we actually reached STOPPED.
+      const res = await Promise.race([
+        send("wt-clock-out"),
+        new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 15000)),
+      ]);
+      st = res || (await send("wt-status"));
+      if (st && st.clockedIn) throw new Error("still_recording");
+      // STOPPED
+      toast("Clocked out ✓");
+    } catch (e) {
+      // Don't strand the user in "Stopping…": surface the failure, log the
+      // reason, and re-enable so pressing Clock Out again retries.
+      console.warn("[ClockWork] clock-out failed:", e && e.message);
+      toast(e && e.message === "timeout"
+        ? "Stop timed out — press Clock Out to retry"
+        : "Couldn't stop — press Clock Out to retry");
+      st = await send("wt-status");
+    } finally {
+      clockingOut = false;
+      await render();
+      fitWindow();
+    }
+  }
+  $("clockOutBtn").onclick = () => doClockOut($("clockOutBtn"));
+  $("clockOutBtn2").onclick = () => doClockOut($("clockOutBtn2"));
 
   $("pauseBtn").onclick = async () => {
     $("pauseBtn").disabled = true;

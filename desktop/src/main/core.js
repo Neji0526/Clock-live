@@ -37,6 +37,14 @@ const store = () => P.store; // store.get/set/remove
 const alarms = () => P.scheduler;
 const action = () => P.tray;
 
+// Capture strategy is uniform across platforms: a single interval timer
+// (wt-shot) fires every `shotMinutes` while clocked in and takes one screenshot.
+// The interval is admin-controlled (app_config.screenshot_interval_minutes,
+// default 10) and synced from the server — see fetchServerConfig / syncConfig.
+// macOS still needs App-Nap suppression so the timer keeps ticking; that is the
+// only platform-specific bit that remains (see armAlarms).
+const APP_NAP_PLATFORM = process.platform === "darwin";
+
 // ---------- settings ----------
 async function getSettings() {
   const { settings } = await P.store.get("settings");
@@ -319,6 +327,49 @@ async function listClients() {
   }
 }
 
+// ---------- server-driven config ----------
+// The screenshot capture interval is set by the admin (app_config.
+// screenshot_interval_minutes) and applies team-wide. Fetch it and mirror it
+// into local settings.shotMinutes so getSettings()/shotIntervalMinutes use it.
+// Returns the applied interval in minutes, or null if it couldn't be fetched.
+async function fetchServerConfig() {
+  const token = await getToken();
+  if (!token) return null;
+  try {
+    const res = await fetch(
+      `${C.SUPABASE_URL}/rest/v1/app_config?select=screenshot_interval_minutes&id=eq.1`,
+      { headers: { apikey: C.SUPABASE_ANON, Authorization: `Bearer ${token}` } }
+    );
+    if (!res.ok) return null;
+    const rows = await res.json();
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (!row) return null;
+    const mins = Math.max(1, Math.min(60, Number(row.screenshot_interval_minutes) || 0));
+    if (!mins) return null;
+    const { settings } = await P.store.get("settings");
+    if (!settings || settings.shotMinutes !== mins) {
+      await P.store.set({ settings: { ...(settings || {}), shotMinutes: mins } });
+    }
+    return mins;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Pull the admin interval and, if it changed, re-arm the shot timer live (no
+// re-clock-in needed). Called on the wt-config tick while recording.
+async function syncConfig() {
+  const prev = shotIntervalMinutes(await getSettings());
+  const mins = await fetchServerConfig();
+  if (mins == null) return;
+  const rec = await getRec();
+  if (!rec) return;
+  if (Math.abs(prev - mins) > 0.001) {
+    await ensureAlarm("wt-shot", mins);
+    console.log(`[ClockWork] screenshot interval updated to ${mins} min (admin)`);
+  }
+}
+
 // ---------- alarms ----------
 async function ensureAlarm(name, periodInMinutes) {
   const existing = alarms().get(name);
@@ -329,15 +380,28 @@ async function ensureAlarm(name, periodInMinutes) {
     delayInMinutes: Math.min(1, periodInMinutes),
   });
 }
+// Uniform screenshot interval (minutes) on every platform. The value is the
+// admin-configured app_config.screenshot_interval_minutes, mirrored into
+// settings.shotMinutes by fetchServerConfig; DEFAULTS.shotMinutes (10) is the
+// fallback before the first server sync or while offline.
+function shotIntervalMinutes(s) {
+  return Math.max(1, Number(s.shotMinutes) || 10);
+}
+
 async function armAlarms(opts) {
   const force = !!(opts && opts.force);
   const s = await getSettings();
-  const shotMin = Math.max(1, Number(s.shotMinutes) || 5);
+  const shotMin = shotIntervalMinutes(s);
   const specs = [
     ["wt-heartbeat", 1],
+    // Interval shot timer runs on every platform now.
     ["wt-shot", shotMin],
     ["wt-capreq", 0.5],
+    // Fast web→desktop command poll (~6s) so a remote Stop/break reflects
+    // near-immediately instead of waiting up to a full heartbeat cycle.
+    ["wt-cmd", 0.1],
     ["wt-engage", 1],
+    ["wt-config", 10], // periodically re-pull the admin screenshot interval
     ["wt-flush-queue", 0.5],
     ["wt-version-check", 360],
   ];
@@ -345,14 +409,20 @@ async function armAlarms(opts) {
     for (const [name] of specs) alarms().clear(name);
   }
   for (const [name, period] of specs) await ensureAlarm(name, period);
+  // Keep macOS from App-Napping us while the interval shot timer must keep
+  // ticking. Not needed on Windows/Linux (no App Nap).
+  try { if (APP_NAP_PLATFORM && P.power) P.power.preventSuspension(); } catch (e) { /* best-effort */ }
 }
 async function clearRecordingAlarms() {
   alarms().clear("wt-heartbeat");
   alarms().clear("wt-shot");
   alarms().clear("wt-capreq");
+  alarms().clear("wt-cmd");
   alarms().clear("wt-engage");
+  alarms().clear("wt-config");
   alarms().clear("wt-flush");
   // keep wt-flush-queue + wt-version-check running
+  try { if (P.power) P.power.release(); } catch (e) { /* best-effort */ }
 }
 
 // ---------- clock in / out ----------
@@ -377,6 +447,9 @@ async function clockIn(clientId) {
   });
   await P.store.remove("clickBuffer");
 
+  // Pull the admin's screenshot interval before arming so the shot timer uses
+  // the current team-wide value from the first tick.
+  await fetchServerConfig().catch(() => {});
   const s = await getSettings();
   P.tracker.setIdleThreshold(Math.max(15, Number(s.idleSeconds) || 300));
   await armAlarms({ force: true });
@@ -639,10 +712,14 @@ async function onAlarm(alarm) {
     await checkForUpdate().catch(() => {});
     return;
   }
+  if (alarm.name === "wt-config") {
+    await syncConfig().catch(() => {});
+    return;
+  }
 
   await recoverFromGapIfNeeded();
 
-  if (alarm.name === "wt-heartbeat" || alarm.name === "wt-capreq") {
+  if (alarm.name === "wt-heartbeat" || alarm.name === "wt-capreq" || alarm.name === "wt-cmd") {
     await pollSessionCommands().catch(() => {});
   }
 
@@ -675,7 +752,7 @@ async function maybeSelfHealScreenshot(trigger) {
   const rec = await getRec();
   if (!rec || rec.paused) return;
   const s = await getSettings();
-  const shotMin = Math.max(1, Number(s.shotMinutes) || 5);
+  const shotMin = shotIntervalMinutes(s);
   const staleMs = Math.round(1.5 * shotMin * 60_000);
   const last = await getLastShotAt();
   const ref = Math.max(last, rec.startedAt || 0);
@@ -862,12 +939,50 @@ async function markCaptureRequest(id, patch) {
   } catch (e) {}
 }
 
+// ---------- server-truth reconciliation ----------
+// The dashboard and the DB are authoritative on whether a session is still open.
+// If a remote Stop (web "Clock Out" / admin) ended the session but the desktop
+// never received/applied the clock_out session-command hint, work_sessions.status
+// flips to 'ended' (or 'abandoned' via auto-close). Detect that here and drop our
+// local recording state, so the desktop can NEVER stay RUNNING while the web
+// shows STOPPED. Throttled so the extra REST read stays cheap even when the
+// command poll runs every few seconds.
+let _lastReconcileAt = 0;
+async function reconcileSessionWithServer(token) {
+  const rec = await getRec();
+  if (!rec || !rec.sessionId) return;
+  if (Date.now() - _lastReconcileAt < 20_000) return;
+  _lastReconcileAt = Date.now();
+  const t = token || (await getToken());
+  if (!t) return;
+  let rows;
+  try {
+    const res = await fetch(
+      `${C.SUPABASE_URL}/rest/v1/work_sessions?select=id,status&id=eq.${encodeURIComponent(rec.sessionId)}`,
+      { headers: { apikey: C.SUPABASE_ANON, Authorization: `Bearer ${t}` } }
+    );
+    if (!res.ok) return;
+    rows = await res.json();
+  } catch (e) {
+    return;
+  }
+  const row = Array.isArray(rows) ? rows[0] : null;
+  if (!row) return;
+  if (row.status && row.status !== "active") {
+    console.log(`[ClockWork] server session is '${row.status}' — stopping locally to stay in sync`);
+    await applySessionCommandLocally("clock_out", rec.sessionId);
+  }
+}
+
 // ---------- web -> desktop session commands ----------
 async function pollSessionCommands() {
   const auth = await getAuth();
   if (!auth || !auth.user_id) return;
   const token = await getToken();
   if (!token) return;
+  // Reconcile first: even if the clock_out command was missed entirely, this
+  // catches a remotely-ended session and stops us locally.
+  await reconcileSessionWithServer(token).catch(() => {});
   let rows;
   try {
     const url =
@@ -884,7 +999,11 @@ async function pollSessionCommands() {
   }
   if (!Array.isArray(rows) || !rows.length) return;
   for (const row of rows) {
-    if (Date.parse(row.expires_at) < Date.now()) {
+    // A stop must never be dropped. Honor clock_out even if the command expired
+    // before we managed to poll (machine asleep / offline / throttled) — that
+    // expiry-skip was exactly what left the desktop RUNNING after a web Stop.
+    // Other commands are time-sensitive hints and may still expire.
+    if (Date.parse(row.expires_at) < Date.now() && row.command !== "clock_out") {
       await markSessionCommand(row.id, "expired");
       continue;
     }
@@ -1247,6 +1366,7 @@ async function bootstrap() {
   const rec = await getRec();
   if (rec) {
     setBadge(rec.paused ? "paused" : "rec");
+    await fetchServerConfig().catch(() => {});
     const s = await getSettings();
     P.tracker.setIdleThreshold(Math.max(15, Number(s.idleSeconds) || 300));
     await armAlarms({ force: false });

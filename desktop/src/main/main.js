@@ -2,14 +2,40 @@
 //
 // Responsibilities:
 //   * Create the app windows: the popup (the extension's toolbar popup, verbatim
-//     UI), the options window (verbatim), and the in-app browser (the embedded
-//     capture surface for click-trail SOPs).
+//     UI) and the in-app browser (the embedded capture surface for click-trail
+//     SOPs).
 //   * Own the tray icon (replaces the toolbar action).
 //   * Wire IPC (ipcMain) — the Electron equivalent of chrome.runtime messaging.
 //   * Inject platform services into the ported core engine and boot it.
 
-const { app, BrowserWindow, ipcMain, shell, net, Menu } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, net, Menu, powerSaveBlocker } = require("electron");
 const path = require("path");
+
+// Prevents macOS App Nap from throttling/suspending the main-process timers
+// that drive periodic screenshots. This is a background tray app, so while the
+// VA works in another app macOS would otherwise nap us and the `wt-shot` alarm
+// (a setInterval) stops firing — realtime screenshots silently never happen.
+// Held only while clocked in (armAlarms) and released on clock-out
+// (clearRecordingAlarms). No-op impact on Windows/Linux, where there is no nap.
+const power = {
+  _id: -1,
+  preventSuspension() {
+    if (this._id !== -1 && powerSaveBlocker.isStarted(this._id)) return;
+    try {
+      this._id = powerSaveBlocker.start("prevent-app-suspension");
+    } catch (e) {
+      this._id = -1;
+    }
+  },
+  release() {
+    try {
+      if (this._id !== -1 && powerSaveBlocker.isStarted(this._id)) powerSaveBlocker.stop(this._id);
+    } catch (e) {
+      /* best-effort */
+    }
+    this._id = -1;
+  },
+};
 
 const store = require("./store");
 const scheduler = require("./scheduler");
@@ -23,7 +49,6 @@ const PRELOAD = path.join(__dirname, "..", "preload", "preload.js");
 const WEBVIEW_PRELOAD = path.join(__dirname, "..", "preload", "webview-preload.js");
 
 let popupWin = null;
-let optionsWin = null;
 let browserWin = null;
 
 // Only one instance — a tracker must be a singleton.
@@ -73,25 +98,6 @@ function showPopup() {
   popupWin.focus();
 }
 
-function showOptions() {
-  if (optionsWin) {
-    optionsWin.show();
-    optionsWin.focus();
-    return;
-  }
-  optionsWin = new BrowserWindow({
-    width: 600,
-    height: 640,
-    title: "ClockWork settings",
-    autoHideMenuBar: true,
-    webPreferences: baseWebPrefs(),
-  });
-  optionsWin.loadFile(path.join(RENDERER, "options.html"));
-  optionsWin.on("closed", () => {
-    optionsWin = null;
-  });
-}
-
 function showBrowser() {
   if (browserWin) {
     browserWin.show();
@@ -128,7 +134,6 @@ async function openDashboard() {
   const { settings } = await store.get("settings");
   const url = settings && settings.dashboardUrl;
   if (url) shell.openExternal(url);
-  else showOptions();
 }
 
 // ---------- IPC (replaces chrome.runtime messaging) ----------
@@ -143,11 +148,10 @@ function wireIpc() {
   ipcMain.handle("storage-set", (_e, obj) => store.set(obj));
   ipcMain.handle("storage-remove", (_e, key) => store.remove(key));
 
-  // chrome.tabs.create / chrome.runtime.openOptionsPage shims.
+  // chrome.tabs.create shim.
   ipcMain.handle("open-external", (_e, url) => {
     if (url) shell.openExternal(url);
   });
-  ipcMain.handle("open-options", () => showOptions());
   ipcMain.handle("open-browser", () => showBrowser());
   ipcMain.handle("open-dashboard", () => openDashboard());
   ipcMain.handle("get-version", () => app.getVersion());
@@ -179,6 +183,7 @@ app.whenReady().then(() => {
     tracker,
     screenshot,
     tray, // exposes setBadgeText / setBadgeBackgroundColor (chrome.action shim)
+    power, // prevent-app-suspension blocker (keeps macOS timers alive while recording)
     appVersion: () => app.getVersion(),
     isOnline: () => {
       try {
@@ -188,7 +193,6 @@ app.whenReady().then(() => {
       }
     },
     openExternal: (url) => shell.openExternal(url),
-    openOptions: () => showOptions(),
   };
 
   core.init(platform);
@@ -196,7 +200,6 @@ app.whenReady().then(() => {
   tray.create({
     openPopup: showPopup,
     openBrowser: showBrowser,
-    openOptions: showOptions,
     openDashboard: openDashboard,
     quit: () => {
       app.isQuitting = true;

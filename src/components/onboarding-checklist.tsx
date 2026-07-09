@@ -6,13 +6,13 @@ import { Button } from "@/components/ui/button";
 import {
   Check,
   Sparkles,
-  Chrome,
   Clock,
   Briefcase,
   BookOpen,
   X,
   ArrowRight,
 } from "lucide-react";
+import { FaChrome } from "react-icons/fa";
 
 /**
  * First-run guidance for new VAs. Auto-detects progress from real data:
@@ -81,7 +81,7 @@ export function OnboardingChecklist({ userId }: { userId: string }) {
         key: "install",
         title: "Install the ClockWork tracker",
         sub: "Three small steps in Chrome. About a minute.",
-        icon: <Chrome className="size-4" />,
+        icon: <FaChrome className="size-4" />,
         done: hasSession,
         cta: { to: "/install", label: "Open installer" },
       },
